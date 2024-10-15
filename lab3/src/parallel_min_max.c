@@ -40,18 +40,27 @@ int main(int argc, char **argv) {
         switch (option_index) {
           case 0:
             seed = atoi(optarg);
-            // your code here
-            // error handling
+            if (seed <= 0)
+            {
+              printf("Invalid input: seed must be a positive number\n");
+              return 1;
+            }
             break;
           case 1:
             array_size = atoi(optarg);
-            // your code here
-            // error handling
+            if (array_size <= 0)
+            {
+              printf("Invalid input: array_size must be a positive number\n");
+              return 1;
+            }
             break;
           case 2:
             pnum = atoi(optarg);
-            // your code here
-            // error handling
+            if (pnum <= 0)
+            {
+              printf("Invalid input: pnum must be a positive number\n");
+              return 1;
+            }
             break;
           case 3:
             with_files = true;
@@ -86,27 +95,47 @@ int main(int argc, char **argv) {
 
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
-  int active_child_processes = 0;
+  int active_processes = 0;
 
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
+  int (*pipe_file_data)[2];
+  if (!with_files)
+    pipe_file_data = malloc(pnum * sizeof(int[2]));
+
+  pid_t child_pid;
+
+  if (with_files)
+    fclose(fopen(".data_file.txt", "w"));
+
   for (int i = 0; i < pnum; i++) {
-    pid_t child_pid = fork();
+    if (!with_files && pipe(pipe_file_data[i]) == -1) {
+      perror("pipe");
+      exit(EXIT_FAILURE);
+    }
+    child_pid = fork();
     if (child_pid >= 0) {
-      // successful fork
-      active_child_processes += 1;
+      struct MinMax forked_min_max;
+      active_processes += 1;
       if (child_pid == 0) {
-        // child process
-
-        // parallel somehow
-
+        unsigned begin_ = i * (array_size / pnum);
+        unsigned end_ = begin_ + array_size / pnum;
+        if ((i+1) >= pnum)
+          end_ = array_size;
+        
+        forked_min_max = GetMinMax(array, begin_, end_);
+        
         if (with_files) {
-          // use files here
+          FILE *file_data = fopen(".data_file.txt", "a+");
+          fprintf(file_data, "%d %d\n", forked_min_max.min, forked_min_max.max);
+          fclose(file_data);
         } else {
-          // use pipe here
+          close(pipe_file_data[i][0]);
+          write(pipe_file_data[i][1], &forked_min_max, sizeof(forked_min_max));
+          close(pipe_file_data[i][1]);
         }
-        return 0;
+        exit(EXIT_SUCCESS);
       }
 
     } else {
@@ -115,29 +144,43 @@ int main(int argc, char **argv) {
     }
   }
 
-  while (active_child_processes > 0) {
-    // your code here
-
-    active_child_processes -= 1;
+  while (active_processes > 0) {
+    active_processes -= 1;
+    wait(NULL);
   }
 
   struct MinMax min_max;
   min_max.min = INT_MAX;
   min_max.max = INT_MIN;
 
+  FILE *file_data;
+  if (with_files)
+    file_data = fopen(".data_file.txt", "r");
+
   for (int i = 0; i < pnum; i++) {
     int min = INT_MAX;
     int max = INT_MIN;
 
     if (with_files) {
-      // read from files
+      fscanf(file_data, "%d %d\n", &min, &max);
     } else {
-      // read from pipes
+      struct MinMax piped_min_max;
+      if (read(pipe_file_data[i][0], &piped_min_max, sizeof(piped_min_max)) == -1)
+        printf("bad pipe\n");
+
+      close(pipe_file_data[i][0]);
+      close(pipe_file_data[i][1]);
+
+      min = piped_min_max.min;
+      max = piped_min_max.max;
     }
 
     if (min < min_max.min) min_max.min = min;
     if (max > min_max.max) min_max.max = max;
   }
+
+  if (with_files)
+    fclose(file_data);
 
   struct timeval finish_time;
   gettimeofday(&finish_time, NULL);
@@ -146,6 +189,8 @@ int main(int argc, char **argv) {
   elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
 
   free(array);
+  if (!with_files)
+    free(pipe_file_data);
 
   printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
@@ -153,3 +198,4 @@ int main(int argc, char **argv) {
   fflush(NULL);
   return 0;
 }
+
