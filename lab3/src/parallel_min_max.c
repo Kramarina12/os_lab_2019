@@ -97,12 +97,12 @@ int main(int argc, char **argv) {
   GenerateArray(array, array_size, seed);
   int active_processes = 0;
 
-  struct timeval start_time;
-  gettimeofday(&start_time, NULL);
+  struct timeval start;
+  gettimeofday(&start, NULL);
 
-  int (*pipe_file_data)[2];
+  int (*pipe_file_descriptor)[2];
   if (!with_files)
-    pipe_file_data = malloc(pnum * sizeof(int[2]));
+    pipe_file_descriptor = malloc(pnum * sizeof(int[2]));
 
   pid_t child_pid;
 
@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
     fclose(fopen(".data_file.txt", "w"));
 
   for (int i = 0; i < pnum; i++) {
-    if (!with_files && pipe(pipe_file_data[i]) == -1) {
+    if (!with_files && pipe(pipe_file_descriptor[i]) == -1) {
       perror("pipe");
       exit(EXIT_FAILURE);
     }
@@ -131,9 +131,9 @@ int main(int argc, char **argv) {
           fprintf(file_data, "%d %d\n", forked_min_max.min, forked_min_max.max);
           fclose(file_data);
         } else {
-          close(pipe_file_data[i][0]);
-          write(pipe_file_data[i][1], &forked_min_max, sizeof(forked_min_max));
-          close(pipe_file_data[i][1]);
+          close(pipe_file_descriptor[i][0]);
+          write(pipe_file_descriptor[i][1], &forked_min_max, sizeof(forked_min_max));
+          close(pipe_file_descriptor[i][1]);
         }
         exit(EXIT_SUCCESS);
       }
@@ -165,11 +165,11 @@ int main(int argc, char **argv) {
       fscanf(file_data, "%d %d\n", &min, &max);
     } else {
       struct MinMax piped_min_max;
-      if (read(pipe_file_data[i][0], &piped_min_max, sizeof(piped_min_max)) == -1)
-        printf("bad pipe\n");
+      if (read(pipe_file_descriptor[i][0], &piped_min_max, sizeof(piped_min_max)) == -1)
+        printf("error\n");
 
-      close(pipe_file_data[i][0]);
-      close(pipe_file_data[i][1]);
+      close(pipe_file_descriptor[i][0]);
+      close(pipe_file_descriptor[i][1]);
 
       min = piped_min_max.min;
       max = piped_min_max.max;
@@ -182,15 +182,15 @@ int main(int argc, char **argv) {
   if (with_files)
     fclose(file_data);
 
-  struct timeval finish_time;
-  gettimeofday(&finish_time, NULL);
+  struct timeval finish;
+  gettimeofday(&finish, NULL);
 
-  double elapsed_time = (finish_time.tv_sec - start_time.tv_sec) * 1000.0;
-  elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
+  double elapsed_time = (finish.tv_sec - start.tv_sec) * 1000.0;
+  elapsed_time += (finish.tv_usec - start.tv_usec) / 1000.0;
 
   free(array);
   if (!with_files)
-    free(pipe_file_data);
+    free(pipe_file_descriptor);
 
   printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
