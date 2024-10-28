@@ -6,7 +6,7 @@
 #include <sys/time.h>
 
 #include "sum.h"
-#include "utils.h"
+#include "../../lab3/src/utils.h"
 
 void *ThreadSum(void *args) {
   struct SumArgs *sum_args = (struct SumArgs *)args;
