@@ -2,41 +2,43 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#define SERV_PORT 10050
-#define BUFSIZE 100
+#include <utils.h>
+
 #define SADDR struct sockaddr
 
-int main() {
+int main(int argc, char *argv[]) {
   const size_t kSize = sizeof(struct sockaddr_in);
+  int lfd, cfd, nread;
+  
+  struct ServerInfo current_info;
+  if (process_options_server(argc, argv, &current_info) != 0)
+    exit(EXIT_FAILURE);
 
-  int lfd, cfd;
-  int nread;
-  char buf[BUFSIZE];
+  char buf[current_info.buff_size];
   struct sockaddr_in servaddr;
   struct sockaddr_in cliaddr;
 
   if ((lfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-    perror("socket");
+    perror("socket problem");
     exit(1);
   }
 
   memset(&servaddr, 0, kSize);
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-  servaddr.sin_port = htons(SERV_PORT);
+  servaddr.sin_port = htons(current_info.server_port);
 
   if (bind(lfd, (SADDR *)&servaddr, kSize) < 0) {
-    perror("bind");
+    perror("bind problem");
     exit(1);
   }
 
   if (listen(lfd, 5) < 0) {
-    perror("listen");
+    perror("listen problem");
     exit(1);
   }
 
@@ -49,7 +51,7 @@ int main() {
     }
     printf("connection established\n");
 
-    while ((nread = read(cfd, buf, BUFSIZE)) > 0) {
+    while ((nread = read(cfd, buf, current_info.buff_size)) > 0) {
       write(1, &buf, nread);
     }
 

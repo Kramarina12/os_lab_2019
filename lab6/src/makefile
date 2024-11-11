@@ -20,5 +20,6 @@ modulo.o: modulo.c
 
 clean:
 	rm -f $(OBJS)
+	rm client server
 
 .PHONY: clean

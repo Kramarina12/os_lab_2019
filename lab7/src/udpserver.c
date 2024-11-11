@@ -8,14 +8,19 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define SERV_PORT 20001
-#define BUFSIZE 1024
+#include <utils.h>
+
 #define SADDR struct sockaddr
 #define SLEN sizeof(struct sockaddr_in)
 
-int main() {
-  int sockfd, n;
-  char mesg[BUFSIZE], ipadr[16];
+int main(int argc, char *argv[]) {
+  int sockfd, nread;
+
+  struct ServerInfo current_info;
+  if (process_options_server(argc, argv, &current_info) != 0)
+    exit(EXIT_FAILURE);
+
+  char mesg[current_info.buff_size], ipadr[16];
   struct sockaddr_in servaddr;
   struct sockaddr_in cliaddr;
 
@@ -27,28 +32,29 @@ int main() {
   memset(&servaddr, 0, SLEN);
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-  servaddr.sin_port = htons(SERV_PORT);
+  servaddr.sin_port = htons(current_info.server_port);
 
   if (bind(sockfd, (SADDR *)&servaddr, SLEN) < 0) {
     perror("bind problem");
     exit(1);
   }
+
   printf("SERVER starts...\n");
 
   while (1) {
     unsigned int len = SLEN;
 
-    if ((n = recvfrom(sockfd, mesg, BUFSIZE, 0, (SADDR *)&cliaddr, &len)) < 0) {
+    if ((nread = recvfrom(sockfd, mesg, current_info.buff_size, 0, (SADDR *)&cliaddr, &len)) < 0) {
       perror("recvfrom");
       exit(1);
     }
-    mesg[n] = 0;
+    mesg[nread] = 0;
 
     printf("REQUEST %s      FROM %s : %d\n", mesg,
            inet_ntop(AF_INET, (void *)&cliaddr.sin_addr.s_addr, ipadr, 16),
            ntohs(cliaddr.sin_port));
 
-    if (sendto(sockfd, mesg, n, 0, (SADDR *)&cliaddr, len) < 0) {
+    if (sendto(sockfd, mesg, nread, 0, (SADDR *)&cliaddr, len) < 0) {
       perror("sendto");
       exit(1);
     }
