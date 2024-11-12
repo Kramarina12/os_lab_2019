@@ -20,19 +20,6 @@ struct FactorialArgs {
   uint64_t mod;
 };
 
-uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
-  uint64_t result = 0;
-  a = a % mod;
-  while (b > 0) {
-    if (b % 2 == 1)
-      result = (result + a) % mod;
-    a = (a * 2) % mod;
-    b /= 2;
-  }
-
-  return result % mod;
-}
-
 uint64_t Factorial(const struct FactorialArgs *args) {
   uint64_t ans = 1;
 
@@ -167,15 +154,11 @@ int main(int argc, char **argv) {
       fprintf(stdout, "Receive: %lu %lu %lu\n", begin, end, mod);
 
       struct FactorialArgs args[tnum];
-      uint64_t n = (end - begin + 1) / tnum;
+      uint64_t range = (end - begin + 1) / tnum;
 
-      for (uint32_t i = 0; i < tnum; i++) {
-        args[i].begin = begin + i * n + 1;
-        if (i == tnum - 1) {
-          args[i].end = end;
-        } else {
-          args[i].end = begin + (i + 1) * n;
-        }
+      for (uint64_t i = 0; i < tnum; i++) {
+        args[i].begin = begin + i * range + 1;
+        args[i].end = (i == tnum - 1) ? end : begin + (i + 1) * range;
         args[i].mod = mod;
 
         if (pthread_create(&threads[i], NULL, ThreadFactorial,
@@ -186,7 +169,7 @@ int main(int argc, char **argv) {
       }
 
       uint64_t total = 1;
-      for (uint32_t i = 0; i < tnum; i++) {
+      for (uint64_t i = 0; i < tnum; i++) {
         uint64_t result = 0;
         pthread_join(threads[i], (void **)&result);
         total = MultModulo(total, result, mod);
@@ -205,5 +188,6 @@ int main(int argc, char **argv) {
     shutdown(client_fd, SHUT_RDWR);
     close(client_fd);
   }
+
   return 0;
 }
